@@ -40,21 +40,57 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
         timeline: false,
         navigationHelpButton: false,
         navigationInstructionsInitiallyVisible: false,
+        skyBox: new Cesium.SkyBox({
+          sources: {
+            positiveX:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg",
+            negativeX:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg",
+            positiveY:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg",
+            negativeY:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg",
+            positiveZ:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg",
+            negativeZ:
+              "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg",
+          },
+        }),
+        imageryProvider: new Cesium.UrlTemplateImageryProvider({
+          url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        }),
       });
 
-      viewerRef.current.scene.globe.enableLighting = false;
-      viewerRef.current.scene.backgroundColor = Cesium.Color.BLACK;
+      const viewer = viewerRef.current;
+      viewer.scene.globe.enableLighting = false;
+      viewer.scene.backgroundColor = Cesium.Color.BLACK;
 
-      viewerRef.current.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-95.0, 35.0, 15000000),
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(6.0, 5.0, 1.2e7),
         orientation: {
           heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-90),
+          pitch: Cesium.Math.toRadians(-60),
           roll: 0.0,
         },
         duration: 0,
       });
+
+      // ---- SLOW ROTATION: east -> west (map moves left) ----
+      const spinRate = Cesium.Math.toRadians(0.5);
+      viewer.clock.onTick.addEventListener((clock: any) => {
+        const deltaSeconds = Cesium.JulianDate.secondsDifference(
+          clock.currentTime,
+          clock.lastTime
+        );
+
+        // Rotate camera around Earth's Z axis
+        viewer.scene.camera.rotate(
+          Cesium.Cartesian3.UNIT_Z,
+          -spinRate * deltaSeconds
+        );
+      });
     };
+
     const loadCesiumScript = () => {
       if ((window as any).Cesium) {
         initCesium();
@@ -63,13 +99,16 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
 
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css";
+      link.href =
+        "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css";
       document.head.appendChild(link);
 
       const script = document.createElement("script");
-      script.src = "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js";
+      script.src =
+        "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js";
       script.onload = () => {
-        (window as any).CESIUM_BASE_URL = "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/";
+        (window as any).CESIUM_BASE_URL =
+          "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/";
         initCesium();
       };
       document.head.appendChild(script);
@@ -85,35 +124,42 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
     };
   }, []);
 
+  // ---------- 2) ENTITIES: PIPELINE + INCIDENT AROUND NIGER DELTA ----------
   useEffect(() => {
     if (!viewerRef.current) return;
 
     const Cesium = (window as any).Cesium;
     if (!Cesium) return;
 
+    const viewer = viewerRef.current;
+
+    // Clear old entities
     entitiesRef.current.forEach((entity) => {
-      viewerRef.current.entities.remove(entity);
+      viewer.entities.remove(entity);
     });
     entitiesRef.current = [];
 
-    const pipelineStart = Cesium.Cartesian3.fromDegrees(-100.0, 36.0);
-    const pipelineEnd = Cesium.Cartesian3.fromDegrees(-95.0, 34.0);
-    const incidentLocation = Cesium.Cartesian3.fromDegrees(-97.5, 35.0);
-    const droneBaseLocation = Cesium.Cartesian3.fromDegrees(-96.0, 35.5);
+    // Around 4–6°N, 5–7°E
+    const pipelineStart = Cesium.Cartesian3.fromDegrees(4.0, 6.0);
+    const pipelineEnd = Cesium.Cartesian3.fromDegrees(8.0, 4.5);
+    const incidentLocation = Cesium.Cartesian3.fromDegrees(6.0, 5.0);
+    const droneBaseLocation = Cesium.Cartesian3.fromDegrees(6.3, 5.5);
 
-    const pipeline = viewerRef.current.entities.add({
+    // Pipeline
+    const pipeline = viewer.entities.add({
       name: "Pipeline",
       polyline: {
-        positions: [pipelineStart, pipelineEnd],
+        positions: [pipelineStart, incidentLocation, pipelineEnd],
         width: 3,
         material: Cesium.Color.CYAN.withAlpha(0.7),
       },
     });
     entitiesRef.current.push(pipeline);
 
+    // When we leave idle, zoom into the Niger Delta
     if (sceneId !== "idle") {
-      viewerRef.current.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-97.5, 35.0, 500000),
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(6.0, 5.0, 400000),
         orientation: {
           heading: Cesium.Math.toRadians(0),
           pitch: Cesium.Math.toRadians(-45),
@@ -131,7 +177,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       sceneId === "drone_deploy" ||
       sceneId === "ethics_wrapup"
     ) {
-      const incident = viewerRef.current.entities.add({
+      const incident = viewer.entities.add({
         name: "Incident",
         position: incidentLocation,
         point: {
@@ -154,23 +200,17 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       entitiesRef.current.push(incident);
     }
 
-    if (
-      sceneId === "device_cloud" ||
-      sceneId === "network_analysis"
-    ) {
+    if (sceneId === "device_cloud" || sceneId === "network_analysis") {
       const devices = [
-        { name: "Device A", offset: [0.05, 0.05] },
-        { name: "Device B", offset: [-0.05, 0.03] },
-        { name: "Device C", offset: [0.03, -0.05] },
+        { name: "Device A", lon: 5.85, lat: 5.15 },
+        { name: "Device B", lon: 6.10, lat: 4.90 },
+        { name: "Device C", lon: 6.25, lat: 5.20 },
       ];
 
       devices.forEach((device) => {
-        const deviceEntity = viewerRef.current.entities.add({
+        const entity = viewer.entities.add({
           name: device.name,
-          position: Cesium.Cartesian3.fromDegrees(
-            -97.5 + device.offset[0],
-            35.0 + device.offset[1]
-          ),
+          position: Cesium.Cartesian3.fromDegrees(device.lon, device.lat),
           point: {
             pixelSize: 10,
             color: Cesium.Color.YELLOW,
@@ -188,14 +228,11 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
             pixelOffset: new Cesium.Cartesian2(0, -15),
           },
         });
-        entitiesRef.current.push(deviceEntity);
+        entitiesRef.current.push(entity);
       });
     }
 
-    if (
-      sceneId === "drone_deploy" ||
-      sceneId === "ethics_wrapup"
-    ) {
+    if (sceneId === "drone_deploy" || sceneId === "ethics_wrapup") {
       const startTime = Cesium.JulianDate.now();
       const endTime = Cesium.JulianDate.addSeconds(
         startTime,
@@ -207,7 +244,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       dronePosition.addSample(startTime, droneBaseLocation);
       dronePosition.addSample(endTime, incidentLocation);
 
-      const drone = viewerRef.current.entities.add({
+      const drone = viewer.entities.add({
         name: "Drone",
         position: dronePosition,
         point: {
@@ -229,7 +266,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       });
       entitiesRef.current.push(drone);
 
-      const droneBase = viewerRef.current.entities.add({
+      const droneBase = viewer.entities.add({
         name: "Drone Base",
         position: droneBaseLocation,
         point: {
@@ -251,11 +288,11 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       });
       entitiesRef.current.push(droneBase);
 
-      viewerRef.current.clock.startTime = startTime.clone();
-      viewerRef.current.clock.stopTime = endTime.clone();
-      viewerRef.current.clock.currentTime = startTime.clone();
-      viewerRef.current.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
-      viewerRef.current.clock.shouldAnimate = true;
+      viewer.clock.startTime = startTime.clone();
+      viewer.clock.stopTime = endTime.clone();
+      viewer.clock.currentTime = startTime.clone();
+      viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+      viewer.clock.shouldAnimate = true;
     }
   }, [sceneId]);
 

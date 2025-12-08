@@ -22,6 +22,10 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
         return;
       }
 
+      Cesium.Ion.defaultAccessToken =
+        process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN ??
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmOTc0ZDcxMy1lZDY1LTQ4NTgtYTJhYi1mODAyM2E0ODE3ODgiLCJpZCI6MzY3NzczLCJpYXQiOjE3NjUyMjMxMjN9.Ie6eWR5nCWznzi1hRDYrAmKwRghbRs680H67tbRsWEc";
+
       if (viewerRef.current) return;
 
       viewerRef.current = new Cesium.Viewer(cesiumContainer.current!, {
@@ -36,17 +40,6 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
         timeline: false,
         navigationHelpButton: false,
         navigationInstructionsInitiallyVisible: false,
-        skyBox: new Cesium.SkyBox({
-          sources: {
-            positiveX: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg",
-            negativeX: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg",
-            positiveY: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg",
-            negativeY: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg",
-            positiveZ: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg",
-            negativeZ: "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg",
-          },
-        }),
-        imageryProvider: new Cesium.IonImageryProvider({ assetId: 3845 }),
       });
 
       viewerRef.current.scene.globe.enableLighting = false;
@@ -62,7 +55,6 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
         duration: 0,
       });
     };
-
     const loadCesiumScript = () => {
       if ((window as any).Cesium) {
         initCesium();

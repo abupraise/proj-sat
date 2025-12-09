@@ -80,3 +80,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+.cesium-viewer .cesium-widget-credits {
+  position: absolute;
+  left: 50%;
+  bottom: 0.75rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 10px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.7);
+  z-index: 10;
+  text-align: center;
+}
+
+.cesium-viewer .cesium-widget-credits > * {
+  display: none !important;
+}
+
+.cesium-viewer .cesium-widget-credits::before {
+  content: "Powered by Cesium ion · OpenStreetMap";
+  display: block;
+  white-space: nowrap;
+}

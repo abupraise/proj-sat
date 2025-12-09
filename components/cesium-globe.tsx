@@ -8,27 +8,30 @@ interface CesiumGlobeProps {
 }
 
 export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
-  const cesiumContainer = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const viewerRef = useRef<any | null>(null);
   const entitiesRef = useRef<any[]>([]);
+  const lastTimeRef = useRef<any | null>(null);
 
+  // ----------------- INIT VIEWER + ROTATION -----------------
   useEffect(() => {
-    if (!cesiumContainer.current) return;
+    if (!containerRef.current) return;
 
-    const initCesium = async () => {
+    const initCesium = () => {
       const Cesium = (window as any).Cesium;
       if (!Cesium) {
         console.error("Cesium not loaded");
         return;
       }
+      if (viewerRef.current) return;
 
+      // IMPORTANT: use a real Cesium Ion token here
       Cesium.Ion.defaultAccessToken =
         process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN ??
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmOTc0ZDcxMy1lZDY1LTQ4NTgtYTJhYi1mODAyM2E0ODE3ODgiLCJpZCI6MzY3NzczLCJpYXQiOjE3NjUyMjMxMjN9.Ie6eWR5nCWznzi1hRDYrAmKwRghbRs680H67tbRsWEc";
 
-      if (viewerRef.current) return;
-
-      viewerRef.current = new Cesium.Viewer(cesiumContainer.current!, {
+      // Viewer with default Ion world imagery (no custom UrlTemplate)
+      const viewer = new Cesium.Viewer(containerRef.current, {
         animation: false,
         baseLayerPicker: false,
         fullscreenButton: false,
@@ -40,6 +43,8 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
         timeline: false,
         navigationHelpButton: false,
         navigationInstructionsInitiallyVisible: false,
+        // no imageryProvider here → Ion world imagery (asset 2) is used
+        // keep a starry skybox like EVA_LAND
         skyBox: new Cesium.SkyBox({
           sources: {
             positiveX:
@@ -56,37 +61,45 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
               "https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg",
           },
         }),
-        imageryProvider: new Cesium.UrlTemplateImageryProvider({
-          url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        }),
       });
 
-      const viewer = viewerRef.current;
+      viewerRef.current = viewer;
+
+      viewer.scene.globe.show = true;
+      viewer.scene.skyAtmosphere.show = true;
       viewer.scene.globe.enableLighting = false;
       viewer.scene.backgroundColor = Cesium.Color.BLACK;
 
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(6.0, 5.0, 1.2e7),
+      // IDLE CAMERA: guaranteed-visible globe
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(0, 0, 2.4e7),
         orientation: {
-          heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-60),
+          heading: 0.0,
+          pitch: -Cesium.Math.PI_OVER_TWO,
           roll: 0.0,
         },
-        duration: 0,
       });
 
-      // ---- SLOW ROTATION: east -> west (map moves left) ----
-      const spinRate = Cesium.Math.toRadians(0.5);
+      // 🌍 SLOW ROTATION east → west
+      const spinRate = Cesium.Math.toRadians(0.5); // degrees / second
+      viewer.clock.shouldAnimate = true;
       viewer.clock.onTick.addEventListener((clock: any) => {
-        const deltaSeconds = Cesium.JulianDate.secondsDifference(
-          clock.currentTime,
-          clock.lastTime
-        );
+        const currentTime = clock.currentTime;
 
-        // Rotate camera around Earth's Z axis
+        if (!lastTimeRef.current) {
+          lastTimeRef.current = Cesium.JulianDate.clone(currentTime);
+          return;
+        }
+
+        const deltaSeconds = Cesium.JulianDate.secondsDifference(
+          currentTime,
+          lastTimeRef.current
+        );
+        lastTimeRef.current = Cesium.JulianDate.clone(currentTime);
+
         viewer.scene.camera.rotate(
           Cesium.Cartesian3.UNIT_Z,
-          -spinRate * deltaSeconds
+          -spinRate * deltaSeconds // negative = east→west apparent motion
         );
       });
     };
@@ -124,28 +137,24 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
     };
   }, []);
 
-  // ---------- 2) ENTITIES: PIPELINE + INCIDENT AROUND NIGER DELTA ----------
+  // ----------------- ENTITIES + CAMERA PER SCENE -----------------
   useEffect(() => {
     if (!viewerRef.current) return;
-
     const Cesium = (window as any).Cesium;
     if (!Cesium) return;
-
     const viewer = viewerRef.current;
 
-    // Clear old entities
-    entitiesRef.current.forEach((entity) => {
-      viewer.entities.remove(entity);
-    });
+    // clear previous entities
+    entitiesRef.current.forEach((e) => viewer.entities.remove(e));
     entitiesRef.current = [];
 
-    // Around 4–6°N, 5–7°E
-    const pipelineStart = Cesium.Cartesian3.fromDegrees(4.0, 6.0);
-    const pipelineEnd = Cesium.Cartesian3.fromDegrees(8.0, 4.5);
+    // Niger Delta region (rough coords)
+    const pipelineStart = Cesium.Cartesian3.fromDegrees(4.0, 6.0); // west delta
+    const pipelineEnd = Cesium.Cartesian3.fromDegrees(8.0, 4.5);   // east / offshore
     const incidentLocation = Cesium.Cartesian3.fromDegrees(6.0, 5.0);
     const droneBaseLocation = Cesium.Cartesian3.fromDegrees(6.3, 5.5);
 
-    // Pipeline
+    // Pipeline polyline
     const pipeline = viewer.entities.add({
       name: "Pipeline",
       polyline: {
@@ -156,19 +165,32 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
     });
     entitiesRef.current.push(pipeline);
 
-    // When we leave idle, zoom into the Niger Delta
-    if (sceneId !== "idle") {
+    // Camera behaviour:
+    //  idle  → wide view (big rotating Earth)
+    //  others → zoom to Niger Delta, globe centered
+    if (sceneId === "idle") {
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(6.0, 5.0, 400000),
+        destination: Cesium.Cartesian3.fromDegrees(0, 0, 2.4e7),
+        orientation: {
+          heading: 0.0,
+          pitch: -Cesium.Math.PI_OVER_TWO,
+          roll: 0.0,
+        },
+        duration: 1.0,
+      });
+    } else {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(6.0, 5.0, 4.0e5),
         orientation: {
           heading: Cesium.Math.toRadians(0),
           pitch: Cesium.Math.toRadians(-45),
           roll: 0.0,
         },
-        duration: 2,
+        duration: 2.0,
       });
     }
 
+    // Incident marker
     if (
       sceneId === "incident_detected" ||
       sceneId === "satellite_zoom" ||
@@ -200,17 +222,18 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       entitiesRef.current.push(incident);
     }
 
+    // Device cloud
     if (sceneId === "device_cloud" || sceneId === "network_analysis") {
       const devices = [
         { name: "Device A", lon: 5.85, lat: 5.15 },
-        { name: "Device B", lon: 6.10, lat: 4.90 },
-        { name: "Device C", lon: 6.25, lat: 5.20 },
+        { name: "Device B", lon: 6.1,  lat: 4.9 },
+        { name: "Device C", lon: 6.25, lat: 5.2 },
       ];
 
-      devices.forEach((device) => {
-        const entity = viewer.entities.add({
-          name: device.name,
-          position: Cesium.Cartesian3.fromDegrees(device.lon, device.lat),
+      devices.forEach((d) => {
+        const ent = viewer.entities.add({
+          name: d.name,
+          position: Cesium.Cartesian3.fromDegrees(d.lon, d.lat),
           point: {
             pixelSize: 10,
             color: Cesium.Color.YELLOW,
@@ -218,7 +241,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
             outlineWidth: 1,
           },
           label: {
-            text: device.name,
+            text: d.name,
             font: "12px sans-serif",
             fillColor: Cesium.Color.YELLOW,
             outlineColor: Cesium.Color.BLACK,
@@ -228,10 +251,11 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
             pixelOffset: new Cesium.Cartesian2(0, -15),
           },
         });
-        entitiesRef.current.push(entity);
+        entitiesRef.current.push(ent);
       });
     }
 
+    // Drone deployment
     if (sceneId === "drone_deploy" || sceneId === "ethics_wrapup") {
       const startTime = Cesium.JulianDate.now();
       const endTime = Cesium.JulianDate.addSeconds(
@@ -266,7 +290,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
       });
       entitiesRef.current.push(drone);
 
-      const droneBase = viewer.entities.add({
+      const base = viewer.entities.add({
         name: "Drone Base",
         position: droneBaseLocation,
         point: {
@@ -286,7 +310,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
           pixelOffset: new Cesium.Cartesian2(0, -15),
         },
       });
-      entitiesRef.current.push(droneBase);
+      entitiesRef.current.push(base);
 
       viewer.clock.startTime = startTime.clone();
       viewer.clock.stopTime = endTime.clone();
@@ -298,7 +322,7 @@ export function CesiumGlobe({ sceneId }: CesiumGlobeProps) {
 
   return (
     <div
-      ref={cesiumContainer}
+      ref={containerRef}
       className="absolute inset-0 w-full h-full"
       style={{ zIndex: 0 }}
     />

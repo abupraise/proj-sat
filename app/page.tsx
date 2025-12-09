@@ -65,12 +65,12 @@ export default function Home() {
                   Pipeline Security Scenario
                 </h1>
                 <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
-                  A fictional, educational visualization of monitoring pipelines
+                  Visualisation of monitoring pipeline vandalisation and insecurity
                 </p>
-                <p className="text-sm text-white/60 max-w-xl mx-auto pt-2">
+                {/* <p className="text-sm text-white/60 max-w-xl mx-auto pt-2">
                   This demonstration uses satellites, IoT devices, and drones in a
                   conceptual security scenario
-                </p>
+                </p> */}
               </div>
             )}
           </div>

@@ -43,7 +43,19 @@ export default function Home() {
   };
 
   const handlePlayPause = () => {
-    setIsPlaying((prev) => !prev);
+    setIsPlaying((prev) => {
+      const nextPlaying = !prev;
+
+      if (nextPlaying && currentIndex === 0 && PIPELINE_STEPS.length > 1) {
+        setCurrentIndex(1);
+      }
+
+      if (nextPlaying && currentIndex === PIPELINE_STEPS.length - 1) {
+        setCurrentIndex(0);
+      }
+
+      return nextPlaying;
+    });
   };
 
   if (!mounted) {
@@ -91,10 +103,10 @@ export default function Home() {
                         <div
                           key={idx}
                           className={`h-1.5 w-8 rounded-full transition-all duration-300 ${idx === currentIndex
-                              ? "bg-white"
-                              : idx < currentIndex
-                                ? "bg-white/50"
-                                : "bg-white/20"
+                            ? "bg-white"
+                            : idx < currentIndex
+                              ? "bg-white/50"
+                              : "bg-white/20"
                             }`}
                         />
                       ))}

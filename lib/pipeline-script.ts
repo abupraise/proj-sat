@@ -47,7 +47,7 @@ export const PIPELINE_STEPS: PipelineStep[] = [
     id: "network_analysis",
     title: "Network & Timeline Analysis",
     description:
-      "Conceptual view of how investigators might visualize associations and movement patterns over time, not a surveillance tutorial.",
+      "Conceptual view of how investigators would visualise devices and movement patterns over time.",
     durationMs: 23000,
   },
   {

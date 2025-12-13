@@ -168,7 +168,7 @@ export default function Home() {
                 {/* Disclaimer */}
                 <div className="pt-3 border-t border-white/10">
                   <p className="text-xs text-white/50 text-center leading-relaxed">
-                    This scenario is fictional and does not represent real surveillance capabilities or legal procedures.
+                    This scenario is an illustration.
                   </p>
                 </div>
               </div>
